@@ -1,19 +1,6 @@
 // contract address and abi
-const contractAddress = "0xa41A97C763d8309ad1babe8F7C9E9991E8210F40";
+const contractAddress = "0x752BCB3b168E6C3ae076D99FEbD0A7c2410Ac2dd";
 const contractABI =[
-    {
-        "anonymous": false,
-        "inputs": [
-            {
-                "indexed": false,
-                "internalType": "string",
-                "name": "message",
-                "type": "string"
-            }
-        ],
-        "name": "metchSuccessful",
-        "type": "event"
-    },
     {
         "anonymous": false,
         "inputs": [
@@ -46,11 +33,11 @@ const contractABI =[
             {
                 "indexed": false,
                 "internalType": "string",
-                "name": "message",
+                "name": "initPLayer",
                 "type": "string"
             }
         ],
-        "name": "queueFull",
+        "name": "resetUI",
         "type": "event"
     },
     {
@@ -58,12 +45,12 @@ const contractABI =[
         "inputs": [
             {
                 "indexed": false,
-                "internalType": "string",
-                "name": "initPLayer",
-                "type": "string"
+                "internalType": "address",
+                "name": "player1Address",
+                "type": "address"
             }
         ],
-        "name": "resetUI",
+        "name": "showFirstPlayer",
         "type": "event"
     },
     {
@@ -162,6 +149,38 @@ const contractABI =[
                 "internalType": "string",
                 "name": "",
                 "type": "string"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "finalWinOption",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "getFinalWinOption",
+        "outputs": [
+            {
+                "internalType": "uint256[]",
+                "name": "",
+                "type": "uint256[]"
             }
         ],
         "stateMutability": "view",
@@ -312,6 +331,7 @@ async function joinGame(){
     }
 }
 
+
 async function initializePage(){
     //get the current wallet address
     onInit();
@@ -338,6 +358,19 @@ async function initializePage(){
     //get current player address
     let player1address = await readGameContract.player1address();
     let player2address = await readGameContract.player2address();
+    //display user address
+    if(player1address == "0x0000000000000000000000000000000000000000"){
+        document.getElementById("player1address").textContent = "Waiting";
+    }else{
+        document.getElementById("player1address").textContent = "X Player1: " + player1address;
+    }
+
+    if(player2address == "0x0000000000000000000000000000000000000000"){
+        document.getElementById("player2address").textContent = "Waiting";
+    }else{
+        document.getElementById("player2address").textContent = "O Player2: " + player2address;
+    }
+
     let player = await readGameContract.currentPlayer();
     //if current user are the player in this metch, allow the user to click the grid
     if(player == "X"){
@@ -349,10 +382,21 @@ async function initializePage(){
             cells.forEach(cell => cell.addEventListener("click", cellClicked));
         }
     }
+    // check game finish 
+    const finalWinOption = await readGameContract.getFinalWinOption();
+    console.log(finalWinOption.length)
+    if(finalWinOption.length = 3){
+        for(let i = 0; i < 9;i++){
+            if(i == finalWinOption[0] || i == finalWinOption[1] || i == finalWinOption[2]){
+                const targetCell = document.querySelector(`.cell[cellIndex="${i}"]`);
+                targetCell.style.backgroundColor = 'lightgreen';
+            }
+        }
+    }
     
     //set smart contract listener
     //when game start will run this function
-    readGameContract.on("startGame",(message,player1address,player2address)=>{
+    readGameContract.on("startGame",async (message,player1address,player2address)=>{
         //according to the uesr wallet address to display the corresponding content
         if(player1address.toLowerCase() == CurrentUserAddress){
             alert(message + "\nYour Round!");
@@ -365,10 +409,17 @@ async function initializePage(){
             alert("Game already start" + "\nWaiting player 1 and 2 finish this game");
             disableBtnJoin();
         }
+        let Displayplayer1 = await readGameContract.player1address();
+        let Displayplayer2 = await readGameContract.player2address();
+        document.getElementById("player1address").textContent = "X Player1: " + Displayplayer1;
+        document.getElementById("player2address").textContent = "O Player2: " + Displayplayer2;
         setTimer();
     });
 
     //when new option store in to smart contract
+    readGameContract.on("showFirstPlayer",(player1Address)=>{
+        document.getElementById("player1address").textContent = "X Player1: " + player1Address;
+    })
     //update the user interface
     readGameContract.on("updateUI",(options)=>{
         for(let i = 0; i < options.length; i++){
@@ -377,13 +428,27 @@ async function initializePage(){
         }
     })
     // display the result and able button when game finish
-    readGameContract.on("showResult",(result)=>{
+    readGameContract.on("showResult",async (result)=>{
         //display the message content 
         if(result == "Draw"){
             statusText.textContent = `Draw!`;
         }else{
-            statusText.textContent = `${result} wins!`;
+            statusText.textContent = `Player ${result} wins!`;
         }
+        //get the 
+        const finalWinOption1 = await readGameContract.finalWinOption(0);
+        const finalWinOption2 = await readGameContract.finalWinOption(1);
+        const finalWinOption3 = await readGameContract.finalWinOption(2);
+        let count = 0;
+        for(let i = 0; i < 9;i++){
+            if(i == finalWinOption1 || i == finalWinOption2 || i == finalWinOption3){
+                const targetCell = document.querySelector(`.cell[cellIndex="${i}"]`);
+                targetCell.style.backgroundColor = 'lightgreen';
+                count++;
+            }
+        }
+
+
         //change the button and html content
         document.getElementById("tips").textContent = "Clikc the button to join";
         cells.forEach(cell => cell.removeEventListener("click", cellClicked));
@@ -417,6 +482,12 @@ async function initializePage(){
         restartBtn.disabled = false;
         joinBtn.disabled = false;
         document.getElementById("tips").textContent = "Clikc the button to join";
+        document.getElementById("player1address").textContent = "Waiting";
+        document.getElementById("player2address").textContent = "Waiting";
+        for(let i = 0; i < 9; i++){
+            const targetCell = document.querySelector(`.cell[cellIndex="${i}"]`);
+            targetCell.style.backgroundColor = 'white';
+        }
     })
 }
 // disable the button and set the message 
